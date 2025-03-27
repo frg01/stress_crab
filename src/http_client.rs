@@ -1,60 +1,124 @@
-use reqwest::{Client,ClientBuilder,Error,Method,header::{HeaderMap,HeaderValue,CONTENT_TYPE}};
+use reqwest::{Client,ClientBuilder,Error,Method,header::{HeaderMap,HeaderValue,CONTENT_TYPE},redirect::Policy,Url};
 use serde_json::{json,value};
-use std::time::Duration;
+use std::time::{Duration,Instant};
+use std::mem;
 
 ///Coding Summary 
-///Create four functions about get/put/post/delete, and create a send_request function to call these four functions uniformly. 
+///Create a function processes  get/put/post/delete method request.
 
-//Commonly used HTTP request
-pub async fn send_request(
-    method: &str,
-    url: &str,
-    body: Option<Value>,
-    headers: Option<HeaderMap>,
-    timeout: Option<Duration>
-) -> Result<reqwest::Response,reqwest::Error> {
+pub struct HttpRequestConfig {
+    pub method: Method,
+    pub url: String,
+    pub headers: HeaderMap,
+    pub json_body: Option<Value>,
+    pub form_body: Option<HashMap<String, String>>,
+    pub timeout: Duration,
+    pub cookie_store: bool,
+    pub redirect_policy: Policy,
+    pub response_time: Option<Duration>,
+    pub client: Option<Client>,
+}
 
-    // setup headers
-    let mut headers = HeaderMap::new();
-    //TODO headers.insert("","");
+impl HttpRequestConfig {
+    pub fn new(
+        method: Method,
+        url: &str,
+        headers: Option<HeaderMap>,
+        json_body: Option<Value>,
+        form_body: Option<HashMap<String, String>>,
+        timeout: Option<Duration>,
+        cookie_store: Option<bool>,
+        redirect_policy: Option<Policy>
+    ) -> Result<Self,String>{
+        //Check URL
+        if Url::parse(url).is_err() {
+            return Err("Invalid URL".to_string());
+        }
 
-    //TODO setup request body 
-    let body = json!({
-        "key":"value"
-    })
+        //check `GET` and `DELETE` request should not have `body`
+        if (method == Method::GET || method == Method::DELETE) && body.is_some(){
+            return Err(format!("Method {} should not have a body", method));
+        }
 
-    //TODO setup timeout 
-    let timeout = Some(Duration::from_secs(10));//replace 10 secs with  time varible
+        //processes Headers ,default nil 
+        let mut final_headers = headers.unwrap_or_default();
 
-    //TODO setup redirect policy 
-    let redirect_policy = Policy::limited(5);//replace 5 with varible
-           
-    //send request 
-    let client_builder = Client::builder()
-        .timeout(timeout.unwrap_or(Duration::from_secs(30)))
-        .redirect(redirect_policy);
+        //if have `body`,check `Content-Type`
+        if json_body.is_some() && !final_headers.contains_key(CONTENT_TYPE) {
+            final_headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        } else if form_body.is_some() {
+            final_headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"));
+        }
 
-    let client_builder = if cookie_store {
-        client_builder.cookie_store(true)
-    } else {
-        client_builder
-    };
+        //return HttpRequestConfig
+        Ok(Self {
+            method,
+            url: url.to_string(),
+            headers: final_headers,
+            json_body,
+            form_body,
+            timeout: timeout.unwrap_or(Duration::from_secs(30)), // default  30s
+            cookie_store: cookie_store.unwrap_or(true), // default turn on Cookie
+            redirect_policy: redirect_policy.unwrap_or(Policy::default()), // use default redirect 
+            response_time: None,
+            client: None,
+        })
 
-    let client = client_builder.build?;
+    }
 
-    let mut request_builder = client.request(method,url);
     
-    if let Some(h) = headers {
-        request_builder = request_builder.headers(h);
+    /// init Client
+    pub async fn init_client(mut self) -> Result<Self, reqwest::Error> {
+        
+        let policy = mem::take(&mut self.redirect_policy);
+
+        // 1. Create `Client`
+        let client_builder = Client::builder()
+            .timeout(self.timeout)
+            .redirect(policy);
+
+        let client = if self.cookie_store {
+            client_builder.cookie_store(true).build()?
+        } else {
+            client_builder.build()?
+        };
+
+        self.client = Some(client);
+        Ok(self)
+
     }
 
-    if let Some(b) = body {
-        request_builder = request_builder.json(&b);
-    }
+    pub async fn send(&mut self) -> Result<Response, reqwest::Error> {
+        
+        //1. ensure client is initialized.
+        let client = self.client.as_ref().expect("Client not initialized");
 
-    request_builder.send().await
+        // 2. Create  `RequestBuilder`
+        let mut request = client.request(self.method.clone(), &self.url);
+
+        // 3. Setup Headers
+        request = request.headers(self.headers.clone());
+
+        // 4. Setup Body
+        if let Some(ref json) = self.json_body {
+            request = request.json(json);
+        } else if let Some(form) = self.form_body {
+            request = request.form(form);
+        }
+
+        //  send request and record response time
+        let start_time = Instant::now();//start time
+        let response = request.send().await;
+        self.response_time = Some(start_time.elapsed());
+
+
+        Ok(response)
+
+
+    }
 
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -62,12 +126,8 @@ mod tests {
     
     async fn test_get_request() {
         
-        let method = "GET";
-        let url = "www.baidu.com";
-        send_request(method,url)
 
-
-        assert_eq!(resp.status(), reqwest::StatusCode::OK);
+        //assert_eq!(resp.status(), reqwest::StatusCode::OK);
 
 
     }
