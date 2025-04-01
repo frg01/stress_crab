@@ -1,9 +1,6 @@
-use reqwest::{Client, Method, Response};
-use serde_json::Value;
-use std::collections::HashMap;
-use std::time::Instant;
+use serde_json::{json};
 mod http_client;
-use HttpRequestConfig;
+use http_client::HttpRequestConfig;
 use std::time::Duration;
 
 #[tokio::main]
@@ -32,8 +29,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 发送 POST 请求
     let mut request_config = HttpRequestConfig::new(
-        Method::POST,
-        "https://httpbin.org/post",
+        "POST",
+        "http://127.0.0.1:8080/WebGoat/login",
         None,
         Some(json_body),
         None,
@@ -43,11 +40,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ).expect("Failed to create request config");
 
     // 初始化 Client
-    request_config = request_config.init_client().await.expect("Failed to initialize client");
+    //request_config = request_config.init_client().await.expect("Failed to initialize client");
 
     // 发送请求
     match request_config.send().await {
         Ok(response) => {
+            println!("Status: {}", response.status());
+            println!("Headers: {:#?}", response.headers());
             let body = response.text().await?;
             println!("Response: {}", body);
         }
@@ -55,6 +54,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Request failed: {}", e);
         }
     }
+
+    match request_config.send().await {
+        Ok(response) => {
+            println!("Status: {}", response.status());
+            println!("Headers: {:#?}", response.headers());
+            let body = response.text().await?;
+            println!("Response: {}", body);
+        }
+        Err(e) => {
+            println!("Request failed: {}", e);
+        }
+    }
+
 
     Ok(())
 
