@@ -43,29 +43,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //request_config = request_config.init_client().await.expect("Failed to initialize client");
 
     // 发送请求
-    match request_config.send().await {
-        Ok(response) => {
-            println!("Status: {}", response.status());
-            println!("Headers: {:#?}", response.headers());
-            let body = response.text().await?;
-            println!("Response: {}", body);
-        }
-        Err(e) => {
-            println!("Request failed: {}", e);
-        }
-    }
-
-    match request_config.send().await {
-        Ok(response) => {
-            println!("Status: {}", response.status());
-            println!("Headers: {:#?}", response.headers());
-            let body = response.text().await?;
-            println!("Response: {}", body);
-        }
-        Err(e) => {
-            println!("Request failed: {}", e);
-        }
-    }
+    // match request_config.send().await {
+    //     Ok(response) => {
+    //         println!("Status: {}", response.status());
+    //         println!("Headers: {:#?}", response.headers());
+    //         let body = response.text().await?;
+    //         println!("Response: {}", body);
+    //     }
+    //     Err(e) => {
+    //         println!("Request failed: {}", e);
+    //     }
+    // }
+    request_config.single_thread_send(3).await;
+    // match request_config.mut_send().await {
+    //     Ok(response) => {
+    //         println!("Status: {}", response.status());
+    //         println!("Headers: {:#?}", response.headers());
+    //         let body = response.text().await?;
+    //         println!("Response: {}", body);
+    //     }
+    //     Err(e) => {
+    //         println!("Request failed: {}", e);
+    //     }
+    // }
 
 
     Ok(())

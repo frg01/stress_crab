@@ -2640,6 +2640,7 @@ dependencies = [
  "clap",
  "config-rs",
  "dotenv",
+ "futures",
  "log",
  "reqwest",
  "rstest",

@@ -4,6 +4,9 @@ use std::time::{Duration,Instant};
 use std::mem;
 use std::collections::HashMap;
 use thiserror::Error;
+use std::sync::Mutex;
+use tokio;
+use futures::future::join_all;
 
 ///Coding Summary 
 ///Create a function processes  get/put/post/delete method request.
@@ -56,12 +59,16 @@ impl HttpRequestConfig {
         }
         
         let method =  method
+            .trim()
+            .to_uppercase()
             .parse::<Method>()
             .map_err(|_| HttpRequestError::InvalidMethod(method.to_string()))?;
 
         //check `GET` and `DELETE` request should not have `body`
-        if (method == Method::GET || method == Method::DELETE) && json_body.is_some() && form_body.is_some() {
-            return Err(HttpRequestError::InvalidMethod(method.to_string()));
+        if (method == Method::GET || method == Method::DELETE) && (json_body.is_some() && form_body.is_some()) {
+            return Err(HttpRequestError::InvalidMethod(format!(
+                        "{}should not have a body",method
+            )));
         }
 
         //processes Headers ,default nil 
@@ -91,7 +98,6 @@ impl HttpRequestConfig {
         };
 
         //self.client = Some(client);
-
 
         //return HttpRequestConfig
         Ok(Self {
@@ -136,6 +142,41 @@ impl HttpRequestConfig {
 
     }
 
+    fn build_request(&self) -> reqwest::RequestBuilder {
+        let client = self.client.as_ref().expect("Client not initialized");
+        let mut request = client.request(self.method.clone(), &self.url);
+        request = request.headers(self.headers.clone());
+        if let Some(ref json) = self.json_body {
+            request = request.json(json);
+        } else if let Some(ref form) = self.form_body {
+            request = request.form(form);
+        }
+        request
+    }
+
+    pub async fn single_thread_send(&mut self,duration: u64) {
+        let duration =  Duration::new(duration,0);
+        let start = Instant::now();
+        let mut count = 0;
+        
+        loop {
+            let elapsed = start.elapsed();
+
+            if elapsed >= duration {
+                println!("Single thread stress test over,duration:{} seconds",elapsed.as_secs());
+                break;
+            }
+
+            count += 1;
+            let begain = Instant::now();
+            let response = self.build_request().send().await;
+            match response {
+                Ok(resp) => println!("Request {}: {}: response_time{}", count, resp.status(),begain.elapsed().subsec_nanos()),
+                Err(e) => println!("Request {} error: {}", count, e),
+            }
+        }
+    }
+
 }
 
 
@@ -146,7 +187,5 @@ mod tests {
     async fn test_get_request() {
         
         //assert_eq!(resp.status(), reqwest::StatusCode::OK);
-
     }
-
-}
+} 
