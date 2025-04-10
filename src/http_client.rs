@@ -5,8 +5,7 @@ use std::mem;
 use std::collections::HashMap;
 use thiserror::Error;
 use std::sync::Mutex;
-use tokio;
-use futures::future::join_all;
+
 
 ///Coding Summary 
 ///Create a function processes  get/put/post/delete method request.
