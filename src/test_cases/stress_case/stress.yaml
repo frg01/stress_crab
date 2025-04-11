@@ -1,0 +1,22 @@
+#
+- id: 0
+  name: index page
+  describe: "这是一个首页接口"
+  method: GET
+  url: "http://127.0.0.1:8080/WebGoat/"
+  headers:
+    Authorization: "Bearer token123"
+  body: null
+  work_num: 1
+
+- id: 1
+  name: login page
+  describe: "这是一个登陆接口"
+  method: POST
+  url: "http://127.0.0.1:8080/WebGoat/login"
+  headers:
+    Content-Type: "application/json"
+  body:
+    name: "Alice"
+    age: 30
+  work_num: 2
